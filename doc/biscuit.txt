@@ -1,0 +1,165 @@
+*biscuit.txt*  Batch quickfix actions and LSP formatting
+
+==============================================================================
+CONTENTS                                                      *biscuit-contents*
+
+    1. Introduction ................................ |biscuit-introduction|
+    2. Requirements ................................ |biscuit-requirements|
+    3. Installation ................................ |biscuit-installation|
+    4. Commands .................................... |biscuit-commands|
+    5. Configuration ............................... |biscuit-configuration|
+    6. Diagnostic Codes ............................ |biscuit-codes|
+    7. API ......................................... |biscuit-api|
+
+==============================================================================
+1. INTRODUCTION                                           *biscuit-introduction*
+
+Biscuit loads files into LSP for project-wide diagnostics and lets you
+batch-apply quickfix actions for specific diagnostic codes across hundreds
+of files.
+
+How it works:~
+    1. |:LoadLSP| loads files and tracks which buffers it opened
+    2. |:ApplyFixes| processes one fix per file per "wave", then waits
+       for LSP to recalculate diagnostics before the next wave
+    3. Buffers with no remaining matching diagnostics are auto-closed
+       (if they were loaded by :LoadLSP)
+
+This batched approach is much faster than applying fixes one-by-one when
+your LSP (like gopls) takes time to recalculate after each change.
+
+==============================================================================
+2. REQUIREMENTS                                           *biscuit-requirements*
+
+- Neovim >= 0.10.0
+- `fd` (recommended) for fast file discovery
+- LSP server(s) configured for your filetypes
+
+==============================================================================
+3. INSTALLATION                                           *biscuit-installation*
+
+Using lazy.nvim: >lua
+    {
+      "taigrr/biscuit.nvim",
+      cmd = { "LoadLSP", "ApplyFixes", "ListDiagnosticCodes", "FormatBuffers" },
+      opts = {
+        codes = {
+          "any",              -- interface{} -> any
+          "slicescontains",   -- Use slices.Contains
+        },
+      },
+    }
+<
+
+==============================================================================
+4. COMMANDS                                                   *biscuit-commands*
+
+                                                                      *:LoadLSP*
+:LoadLSP [dir] [exts...]
+    Load files into LSP for project-wide diagnostics. Uses current buffer's
+    filetype if no extensions are provided. Tracks loaded buffers for
+    auto-cleanup after |:ApplyFixes|.
+
+                                                                 *:UnloadHidden*
+:UnloadHidden
+    Unload all hidden buffers to free LSP resources.
+
+                                                                *:UnloadTracked*
+:UnloadTracked
+    Unload buffers that were loaded by |:LoadLSP|. Called automatically
+    by |:ApplyFixes| when `auto_close = true`.
+
+                                                                   *:ApplyFixes*
+:ApplyFixes[!] [codes...]
+    Apply quickfix actions for diagnostics matching specified codes.
+    If no codes specified, uses configured codes from setup().
+    Use `!` for dry run mode to preview changes.
+
+    Processing happens in waves:~
+        - Each wave applies one fix per file (in parallel)
+        - After a wave, waits for LSP to recalculate (`wave_delay`)
+        - Buffers with no remaining diagnostics are closed
+        - Repeats until no matching diagnostics remain
+
+                                                          *:ListDiagnosticCodes*
+:ListDiagnosticCodes
+    List diagnostic codes from loaded buffers. Use this to discover
+    what codes your LSP provides.
+
+                                                          *:ListConfiguredCodes*
+:ListConfiguredCodes
+    List configured diagnostic codes.
+
+                                                               *:FormatBuffers*
+:FormatBuffers[!]
+    Format all loaded buffers using LSP (textDocument/formatting).
+    Use `!` for dry run mode to preview which buffers would be formatted.
+
+==============================================================================
+5. CONFIGURATION                                         *biscuit-configuration*
+
+>lua
+    require("biscuit").setup({
+      -- Diagnostic codes to auto-fix (exact match on diag.code)
+      codes = {
+        "any",              -- gopls: interface{} -> any
+        "slicescontains",   -- gopls: Use slices.Contains
+      },
+      batch_size = 10,        -- Files per batch when loading
+      batch_delay = 50,       -- Milliseconds between batches during load
+      wave_delay = 3000,      -- Milliseconds between fix waves (LSP recalc time)
+      max_files = 0,          -- Maximum files to load (0 = unlimited)
+      auto_save = true,       -- Save files after applying actions
+      auto_close = true,      -- Close tracked buffers after all fixes applied
+      exclude_dirs = {        -- Directories to exclude from scanning
+        "node_modules", ".git", "dist", "build",
+        "__pycache__", ".venv", "vendor", ".next",
+      },
+    })
+<
+
+Tuning `wave_delay`:~
+    If your LSP is fast (e.g., lua_ls), reduce to 500-1000ms.
+    If gopls is slow with many files, increase to 4000-5000ms.
+
+==============================================================================
+6. DIAGNOSTIC CODES                                             *biscuit-codes*
+
+Diagnostic codes are the "code" field from LSP diagnostics. These identify
+specific issues that can be auto-fixed.
+
+Common gopls codes:~
+    `any`               Use `any` instead of `interface{}`
+    `slicescontains`    Use `slices.Contains` instead of loop
+    `printf`            Printf format specifier issues
+    `unusedwrite`       Unused write to variable
+    `fillstruct`        Fill struct with zero values
+
+TypeScript codes:~
+    `6133`              Unused variable
+    `6196`              Unused import
+
+Run |:ListDiagnosticCodes| after |:LoadLSP| to see available codes.
+
+==============================================================================
+7. API                                                             *biscuit-api*
+
+                                                              *biscuit.setup()*
+biscuit.setup({opts})
+    Initialize the plugin with the given configuration.
+
+                                                              *biscuit.config*
+biscuit.config
+    Current configuration after setup.
+
+                                              *biscuit.loader.tracked_buffers*
+require("biscuit.loader").tracked_buffers
+    Table of buffer IDs loaded by |:LoadLSP|.
+
+                                               *biscuit.loader.clear_tracked()*
+require("biscuit.loader").clear_tracked()
+    Unload all tracked buffers and clear the tracking table.
+    Returns the number of buffers unloaded.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
