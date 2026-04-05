@@ -38,7 +38,7 @@ You have 200 Go files with `interface{}` that should be `any`. Opening each file
 
 - **Load files into LSP** — Get diagnostics for your entire project
 - **Batch quickfix by diagnostic code** — Specify codes like `any`, `slicescontains`, `printf`
-- **Safe by default** — Only applies when there's exactly one quickfix action
+- **Safe by default** — Only applies quickfix-kind actions, picking the first match
 - **Batch LSP formatting** — Run `textDocument/formatting` on all loaded buffers
 - **Dry run mode** — Preview changes before applying
 
@@ -125,7 +125,7 @@ require("biscuit").setup({
   -- Directories to skip
   exclude_dirs = {
     "node_modules", ".git", "dist", "build",
-    "__pycache__", ".venv", "vendor", ".next",
+    "__pycache__", ".venv", "vendor", ".next", "coverage",
   },
 })
 ```

@@ -33,9 +33,9 @@ function M.check()
   local ok, biscuit = pcall(require, 'biscuit')
   if ok then
     local cfg = biscuit.config
-    vim.health.ok(string.format('Diagnostic sources configured: %d', #cfg.sources))
-    if #cfg.sources > 0 then
-      vim.health.info('  ' .. table.concat(cfg.sources, ', '))
+    vim.health.ok(string.format('Diagnostic codes configured: %d', #cfg.codes))
+    if #cfg.codes > 0 then
+      vim.health.info('  ' .. table.concat(cfg.codes, ', '))
     end
     vim.health.info(string.format('Wave delay: %dms', cfg.wave_delay))
     vim.health.info(string.format('Auto-close tracked buffers: %s', cfg.auto_close and 'yes' or 'no'))
