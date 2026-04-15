@@ -113,7 +113,7 @@ Using lazy.nvim: >lua
       auto_close = true,      -- Close tracked buffers after all fixes applied
       exclude_dirs = {        -- Directories to exclude from scanning
         "node_modules", ".git", "dist", "build",
-        "__pycache__", ".venv", "vendor", ".next",
+        "__pycache__", ".venv", "vendor", ".next", "coverage",
       },
     })
 <
