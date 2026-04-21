@@ -3,7 +3,6 @@ local M = {}
 function M.check()
   vim.health.start('biscuit.nvim')
 
-  -- Check Neovim version
   local nvim_version = vim.version()
   if nvim_version.major > 0 or (nvim_version.major == 0 and nvim_version.minor >= 10) then
     vim.health.ok(string.format('Neovim version: %d.%d.%d', nvim_version.major, nvim_version.minor, nvim_version.patch))
@@ -11,14 +10,28 @@ function M.check()
     vim.health.error('Neovim >= 0.10.0 required', 'Update Neovim to a newer version')
   end
 
-  -- Check for fd (optional but recommended)
   if vim.fn.executable('fd') == 1 then
     vim.health.ok('fd found (fast file search)')
   else
     vim.health.warn('fd not found', 'Install fd for faster file discovery: https://github.com/sharkdp/fd')
   end
 
-  -- Check LSP
+  -- Check file descriptor limit (macOS defaults to 256 which causes EMFILE)
+  local handle = io.popen('ulimit -n 2>/dev/null')
+  if handle then
+    local result = handle:read('*l')
+    handle:close()
+    local fd_limit = tonumber(result) or 0
+    if fd_limit > 0 and fd_limit < 1024 then
+      vim.health.warn(
+        string.format('File descriptor limit is low (%d)', fd_limit),
+        'Run `ulimit -n 4096` before Neovim to avoid EMFILE errors when loading many files'
+      )
+    elseif fd_limit >= 1024 then
+      vim.health.ok(string.format('File descriptor limit: %d', fd_limit))
+    end
+  end
+
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   if #clients > 0 then
     local names = vim.tbl_map(function(c)
@@ -29,7 +42,6 @@ function M.check()
     vim.health.info('No LSP clients attached to current buffer')
   end
 
-  -- Check configuration
   local ok, biscuit = pcall(require, 'biscuit')
   if ok then
     local cfg = biscuit.config
@@ -37,6 +49,7 @@ function M.check()
     if #cfg.codes > 0 then
       vim.health.info('  ' .. table.concat(cfg.codes, ', '))
     end
+    vim.health.info(string.format('Batch size: %d, batch delay: %dms', cfg.batch_size, cfg.batch_delay))
     vim.health.info(string.format('Wave delay: %dms', cfg.wave_delay))
     vim.health.info(string.format('Auto-close tracked buffers: %s', cfg.auto_close and 'yes' or 'no'))
 

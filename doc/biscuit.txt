@@ -9,7 +9,8 @@ CONTENTS                                                      *biscuit-contents*
     4. Commands .................................... |biscuit-commands|
     5. Configuration ............................... |biscuit-configuration|
     6. Diagnostic Codes ............................ |biscuit-codes|
-    7. API ......................................... |biscuit-api|
+    7. Troubleshooting ............................. |biscuit-troubleshooting|
+    8. API ......................................... |biscuit-api|
 
 ==============================================================================
 1. INTRODUCTION                                           *biscuit-introduction*
@@ -142,7 +143,29 @@ TypeScript codes:~
 Run |:ListDiagnosticCodes| after |:LoadLSP| to see available codes.
 
 ==============================================================================
-7. API                                                             *biscuit-api*
+7. TROUBLESHOOTING                                     *biscuit-troubleshooting*
+
+EMFILE: Too many open files~
+
+macOS defaults to a file descriptor limit of 256, which is too low when
+loading hundreds of files. Biscuit detects low limits and warns you, but
+you should raise the limit before starting Neovim:
+
+    In your shell profile (~/.zshrc or ~/.bashrc): >bash
+        ulimit -n 4096
+<
+
+    Or for the current session only: >bash
+        ulimit -n 4096 && nvim
+<
+
+    Run |:checkhealth| biscuit to verify the limit is adequate.
+
+    Alternatively, reduce `batch_size` to load fewer files concurrently,
+    or set `max_files` to cap the total number of files loaded.
+
+==============================================================================
+8. API                                                             *biscuit-api*
 
                                                               *biscuit.setup()*
 biscuit.setup({opts})

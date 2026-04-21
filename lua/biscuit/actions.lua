@@ -1,10 +1,10 @@
 ---@class Biscuit.Actions
 local M = {}
 
-local loader = require("biscuit.loader")
+local loader = require('biscuit.loader')
 
 local function get_config()
-  return require("biscuit").config
+  return require('biscuit').config
 end
 
 ---Check if diagnostic code matches any configured code
@@ -26,7 +26,7 @@ end
 
 ---Get matching diagnostics grouped by buffer
 ---@param codes string[]
----@return table<integer, vim.Diagnostic[]> by_buffer
+---@return table<integer, table[]> by_buffer
 local function get_diagnostics_by_buffer(codes)
   local by_buffer = {}
   for _, diag in ipairs(vim.diagnostic.get()) do
@@ -40,9 +40,27 @@ local function get_diagnostics_by_buffer(codes)
   return by_buffer
 end
 
+---Execute an LSP command via the appropriate client.
+---Uses client:exec_command (Neovim 0.11+) with a fallback for older versions.
+---@param bufnr integer
+---@param command table
+local function execute_command(bufnr, command)
+  local clients = vim.lsp.get_clients({ bufnr = bufnr })
+  for _, client in ipairs(clients) do
+    if client.exec_command then
+      client:exec_command(command)
+      return
+    end
+  end
+  -- Fallback for Neovim < 0.11
+  if vim.lsp.buf.execute_command then
+    vim.lsp.buf.execute_command(command)
+  end
+end
+
 ---Apply one quickfix action for a diagnostic
 ---@param bufnr integer
----@param diag vim.Diagnostic
+---@param diag table
 ---@param dry_run boolean
 ---@param callback fun(applied: boolean, action_title?: string)
 local function apply_one_fix(bufnr, diag, dry_run, callback)
@@ -51,13 +69,12 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
     return
   end
 
-  local clients = vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/codeAction" })
+  local clients = vim.lsp.get_clients({ bufnr = bufnr, method = 'textDocument/codeAction' })
   if #clients == 0 then
     callback(false)
     return
   end
 
-  -- Get LSP diagnostic with user_data
   local all_diags = {}
   for _, client in ipairs(clients) do
     local ns_push = vim.lsp.diagnostic.get_namespace(client.id, false)
@@ -80,7 +97,7 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
     textDocument = vim.lsp.util.make_text_document_params(bufnr),
     range = {
       start = { line = diag.lnum, character = diag.col },
-      ["end"] = { line = diag.lnum, character = diag.col },
+      ['end'] = { line = diag.lnum, character = diag.col },
     },
     context = {
       diagnostics = { lsp_diag },
@@ -88,7 +105,7 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
     },
   }
 
-  vim.lsp.buf_request_all(bufnr, "textDocument/codeAction", params, function(results)
+  vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
     local actions = {}
     for _, res in pairs(results or {}) do
       for _, action in ipairs(res.result or {}) do
@@ -97,7 +114,7 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
     end
 
     local quickfix_actions = vim.tbl_filter(function(a)
-      return a.kind and (a.kind == "quickfix" or vim.startswith(a.kind, "quickfix."))
+      return a.kind and (a.kind == 'quickfix' or vim.startswith(a.kind, 'quickfix.'))
     end, actions)
 
     if #quickfix_actions >= 1 then
@@ -106,12 +123,12 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
         callback(true, action.title)
       else
         if action.edit then
-          vim.lsp.util.apply_workspace_edit(action.edit, "utf-8")
+          vim.lsp.util.apply_workspace_edit(action.edit, 'utf-8')
         end
         if action.command then
           local command = action.command
-          if type(command) == "table" then
-            vim.lsp.buf.execute_command(command)
+          if type(command) == 'table' then
+            execute_command(bufnr, command)
           end
         end
         callback(true, action.title)
@@ -135,7 +152,7 @@ end
 ---    3. Check which buffers still have matching diagnostics
 ---    4. Repeat until no diagnostics remain
 ---
----  This turns N×3s into ~W×3s where W is the max diagnostics per file.
+---  This turns N*3s into ~W*3s where W is the max diagnostics per file.
 ---
 ---Why clean up at the START of the next wave?
 ---  After applying a fix and saving, the diagnostic disappears immediately from
@@ -160,25 +177,23 @@ function M.apply_actions(opts)
     return
   end
 
-  local notify = loader.create_notifier("ApplyFixes")
-  notify(string.format("Looking for diagnostics with codes: %s", table.concat(codes, ", ")))
+  local notify = loader.create_notifier('ApplyFixes')
+  notify(string.format('Looking for diagnostics with codes: %s', table.concat(codes, ', ')))
 
   local total_applied = 0
   local total_skipped = 0
   local buffers_cleaned = 0
   local wave = 0
   local max_waves = 100
-  local prev_wave_buffers = {} -- Buffers from previous wave to check for cleanup
+  local prev_wave_buffers = {}
 
   local function run_wave()
     wave = wave + 1
     if wave > max_waves then
-      notify("Max waves reached", "warn")
+      notify('Max waves reached', 'warn')
       return
     end
 
-    -- Clean up buffers from previous wave that no longer have matching diagnostics
-    -- We do this at the START of the next wave, after LSP has had time to recalculate
     if cfg.auto_close and next(prev_wave_buffers) then
       local current_by_buffer = get_diagnostics_by_buffer(codes)
       for bufnr_check in pairs(prev_wave_buffers) do
@@ -195,24 +210,22 @@ function M.apply_actions(opts)
     local buffers_with_diags = vim.tbl_keys(by_buffer)
 
     if #buffers_with_diags == 0 then
-      -- Done - no more matching diagnostics
-      local clean_msg = buffers_cleaned > 0 and string.format(", closed %d buffers", buffers_cleaned) or ""
+      local clean_msg = buffers_cleaned > 0 and string.format(', closed %d buffers', buffers_cleaned) or ''
       if dry_run then
-        notify(string.format("[DRY RUN] Would apply %d fixes in %d waves%s", total_applied, wave - 1, clean_msg))
+        notify(string.format('[DRY RUN] Would apply %d fixes in %d waves%s', total_applied, wave - 1, clean_msg))
       else
-        notify(string.format("Applied %d fixes in %d waves%s", total_applied, wave - 1, clean_msg))
+        notify(string.format('Applied %d fixes in %d waves%s', total_applied, wave - 1, clean_msg))
       end
       return
     end
 
-    notify(string.format("[Wave %d] Processing %d files...", wave, #buffers_with_diags))
+    notify(string.format('[Wave %d] Processing %d files...', wave, #buffers_with_diags))
 
     local pending = #buffers_with_diags
     local wave_applied = 0
     local wave_skipped = 0
 
     for bufnr, diags in pairs(by_buffer) do
-      -- Pick first diagnostic for this buffer
       local diag = diags[1]
       prev_wave_buffers[bufnr] = true
 
@@ -221,14 +234,14 @@ function M.apply_actions(opts)
           wave_applied = wave_applied + 1
           total_applied = total_applied + 1
           if dry_run then
-            local fname = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":~:.")
+            local fname = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ':~:.')
             vim.notify(
-              string.format("[DRY RUN] %s:%d [%s] %s", fname, diag.lnum + 1, diag.code or "?", title),
+              string.format('[DRY RUN] %s:%d [%s] %s', fname, diag.lnum + 1, diag.code or '?', title),
               vim.log.levels.INFO
             )
           elseif cfg.auto_save and vim.api.nvim_buf_is_valid(bufnr) and vim.bo[bufnr].modified then
             vim.api.nvim_buf_call(bufnr, function()
-              vim.cmd("silent! write")
+              vim.cmd('silent! write')
             end)
           end
         else
@@ -238,13 +251,10 @@ function M.apply_actions(opts)
 
         pending = pending - 1
         if pending == 0 then
-          -- Wave complete
           if wave_applied == 0 then
-            -- No fixes applied this wave, we're stuck or done
-            local clean_msg = buffers_cleaned > 0 and string.format(", closed %d buffers", buffers_cleaned) or ""
-            notify(string.format("Done. Applied %d, skipped %d%s", total_applied, total_skipped, clean_msg))
+            local clean_msg = buffers_cleaned > 0 and string.format(', closed %d buffers', buffers_cleaned) or ''
+            notify(string.format('Done. Applied %d, skipped %d%s', total_applied, total_skipped, clean_msg))
           else
-            -- Wait for LSP to recalculate, then next wave
             vim.defer_fn(run_wave, cfg.wave_delay)
           end
         end
@@ -263,11 +273,10 @@ function M.list_codes(opts)
 
   local diagnostics = vim.diagnostic.get()
   if #diagnostics == 0 then
-    vim.notify("No diagnostics found", vim.log.levels.INFO)
+    vim.notify('No diagnostics found', vim.log.levels.INFO)
     return
   end
 
-  -- Group by diagnostic code
   local by_code = {}
   for _, diag in ipairs(diagnostics) do
     local code = diag.code and tostring(diag.code) or nil
@@ -282,7 +291,6 @@ function M.list_codes(opts)
     end
   end
 
-  -- Sort by count
   local sorted = {}
   for code, data in pairs(by_code) do
     table.insert(sorted, { code = code, count = data.count, sources = data.sources })
@@ -292,11 +300,11 @@ function M.list_codes(opts)
   end)
 
   if #sorted == 0 then
-    vim.notify("No diagnostic codes found (diagnostics have no code field)", vim.log.levels.INFO)
+    vim.notify('No diagnostic codes found (diagnostics have no code field)', vim.log.levels.INFO)
     return
   end
 
-  vim.notify("Diagnostic codes (for biscuit config):", vim.log.levels.INFO)
+  vim.notify('Diagnostic codes (for biscuit config):', vim.log.levels.INFO)
   local shown = 0
   for _, item in ipairs(sorted) do
     if shown >= limit then
@@ -304,8 +312,8 @@ function M.list_codes(opts)
     end
     shown = shown + 1
     local source_list = vim.tbl_keys(item.sources)
-    local sources_str = #source_list > 0 and (" from " .. table.concat(source_list, ", ")) or ""
-    vim.notify(string.format("  [%d] %s%s", item.count, item.code, sources_str), vim.log.levels.INFO)
+    local sources_str = #source_list > 0 and (' from ' .. table.concat(source_list, ', ')) or ''
+    vim.notify(string.format('  [%d] %s%s', item.count, item.code, sources_str), vim.log.levels.INFO)
   end
 end
 

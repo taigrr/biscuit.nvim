@@ -98,6 +98,7 @@ You have 200 Go files with `interface{}` that should be `any`. Opening each file
 |---------|-------------|
 | `:LoadLSP [dir] [exts...]` | Load files into LSP (uses current filetype if no args) |
 | `:UnloadHidden` | Unload hidden buffers to free resources |
+| `:UnloadTracked` | Unload buffers loaded by `:LoadLSP` |
 | `:ApplyFixes[!] [codes...]` | Apply quickfixes for diagnostic codes. `!` for dry run |
 | `:ListDiagnosticCodes` | List diagnostic codes from loaded buffers |
 | `:ListConfiguredCodes` | List configured codes |
@@ -166,11 +167,26 @@ Run `:ListDiagnosticCodes` after `:LoadLSP` to see what codes your LSP provides.
 :checkhealth biscuit
 ```
 
+## Troubleshooting
+
+### EMFILE: Too many open files (macOS)
+
+macOS defaults to a file descriptor limit of 256. Loading hundreds of files
+will exceed this. Add to your `~/.zshrc` or `~/.bashrc`:
+
+```bash
+ulimit -n 4096
+```
+
+Biscuit detects low limits and warns you via `:checkhealth biscuit`.
+You can also reduce `batch_size` or set `max_files` to stay under the limit.
+
 ## Tips
 
 - **Discover codes**: Run `:ListDiagnosticCodes` to see what your LSP provides
 - **Start with dry run**: Use `!` to preview changes first
-- **Clean up**: Run `:UnloadHidden` after batch operations to free memory
+- **Clean up**: Run `:UnloadTracked` after batch operations to free memory
+- **Health check**: Run `:checkhealth biscuit` to verify your setup
 
 ## License
 

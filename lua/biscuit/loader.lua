@@ -1,7 +1,6 @@
 ---@class Biscuit.Loader
 local M = {}
 
--- Track buffers loaded by LoadLSP for cleanup
 ---@type table<integer, boolean>
 M.tracked_buffers = {}
 
@@ -9,7 +8,6 @@ local config = function()
   return require('biscuit').config
 end
 
--- Filetype to extension mapping
 local ft_to_ext = {
   typescript = { 'ts', 'tsx' },
   typescriptreact = { 'ts', 'tsx' },
@@ -38,6 +36,19 @@ local ft_to_ext = {
   toml = { 'toml' },
   markdown = { 'md' },
 }
+
+---Read the current file descriptor soft limit.
+---macOS defaults to 256 which is far too low for loading hundreds of buffers.
+---@return integer current_limit
+local function get_fd_limit()
+  local handle = io.popen('ulimit -n 2>/dev/null')
+  if not handle then
+    return 256
+  end
+  local result = handle:read('*l')
+  handle:close()
+  return tonumber(result) or 256
+end
 
 ---Get file extensions for current buffer's filetype
 ---@return string[]|nil extensions
@@ -80,16 +91,28 @@ end
 ---@param on_done fun(files: string[])
 function M.find_files_async(root, exts, on_done)
   local results = {}
-  local handle
   local stdout = vim.uv.new_pipe(false)
+  local handle ---@type uv.uv_process_t|nil
+  local stdout_closed = false
+  local handle_closed = false
+
+  local function safe_close()
+    if not stdout_closed and stdout then
+      stdout_closed = true
+      if not stdout:is_closing() then
+        stdout:close()
+      end
+    end
+    if not handle_closed and handle then
+      handle_closed = true
+      if not handle:is_closing() then
+        handle:close()
+      end
+    end
+  end
 
   local function finish()
-    if handle then
-      handle:close()
-    end
-    if stdout then
-      stdout:close()
-    end
+    safe_close()
     vim.schedule(function()
       on_done(results)
     end)
@@ -116,6 +139,15 @@ function M.find_files_async(root, exts, on_done)
     }, function()
       finish()
     end)
+
+    if not handle then
+      safe_close()
+      vim.schedule(function()
+        vim.notify('[biscuit] Failed to spawn fd', vim.log.levels.ERROR)
+        on_done(results)
+      end)
+      return
+    end
 
     vim.uv.read_start(stdout, function(err, data)
       if err then
@@ -212,7 +244,12 @@ function M.create_notifier(title)
   end
 end
 
----Load files into LSP for diagnostics
+---Load files into LSP for diagnostics.
+---
+---Buffers are loaded in small batches with delays between them to avoid
+---hitting the macOS default file descriptor limit (EMFILE "too many open
+---files"). The batch_size and batch_delay config options control throughput
+---vs. fd pressure.
 ---@param opts? { folder?: string, extensions?: string[] }
 function M.load_files(opts)
   opts = opts or {}
@@ -232,6 +269,12 @@ function M.load_files(opts)
   local notify = M.create_notifier('LoadLSP')
   local cfg = config()
 
+  -- Try to raise fd limit before loading hundreds of files
+  local fd_limit = get_fd_limit()
+  if fd_limit < 1024 then
+    notify(string.format('Warning: low fd limit (%d). Consider running `ulimit -n 4096` before Neovim.', fd_limit), 'warn')
+  end
+
   ---@cast exts string[]
   notify(string.format('Scanning %s for %s files...', root, table.concat(exts, ', ')))
 
@@ -246,11 +289,18 @@ function M.load_files(opts)
       return
     end
 
+    -- If the total exceeds a safe threshold relative to the fd limit,
+    -- automatically cap batch_size to avoid EMFILE.
+    -- Each loaded buffer holds ~1-2 fds (file + LSP pipe). Reserve 128 fds
+    -- for Neovim internals, LSP processes, and other I/O.
+    local safe_concurrent = math.max(1, fd_limit - 128)
+    local effective_batch = math.min(cfg.batch_size, safe_concurrent)
+
     local loaded = 0
     local skipped = 0
 
     local function load_batch(start_idx)
-      local end_idx = math.min(start_idx + cfg.batch_size - 1, total)
+      local end_idx = math.min(start_idx + effective_batch - 1, total)
 
       for i = start_idx, end_idx do
         local _, was_loaded = M.load_buffer_with_lsp(files[i])
