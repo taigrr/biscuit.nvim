@@ -188,30 +188,39 @@ function M.load_buffer_with_lsp(filepath, track)
     vim.api.nvim_buf_call(bufnr, function()
       vim.cmd('filetype detect')
     end)
-    -- Explicitly notify LSP clients that this buffer is open
-    vim.schedule(function()
-      local clients = vim.lsp.get_clients({ bufnr = bufnr })
-      for _, client in ipairs(clients) do
-        if not client.attached_buffers[bufnr] then
-          vim.lsp.buf_attach_client(bufnr, client.id)
-        end
-        -- Send didOpen notification to trigger diagnostics
-        local params = {
-          textDocument = {
-            uri = vim.uri_from_bufnr(bufnr),
-            languageId = vim.bo[bufnr].filetype,
-            version = 0,
-            text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n'),
-          },
-        }
-        client.notify('textDocument/didOpen', params)
-      end
-    end)
     if track then
       M.tracked_buffers[bufnr] = true
     end
   end
   return bufnr, was_loaded
+end
+
+---Notify LSP about a buffer being open (triggers diagnostics)
+---@param bufnr integer
+function M.notify_lsp_open(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) then return end
+  local clients = vim.lsp.get_clients({ bufnr = bufnr })
+  for _, client in ipairs(clients) do
+    if not client.attached_buffers[bufnr] then
+      vim.lsp.buf_attach_client(bufnr, client.id)
+    end
+    local params = {
+      textDocument = {
+        uri = vim.uri_from_bufnr(bufnr),
+        languageId = vim.bo[bufnr].filetype,
+        version = 0,
+        text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n'),
+      },
+    }
+    client.notify('textDocument/didOpen', params)
+  end
+end
+
+---Notify LSP about all tracked buffers (call after loading completes)
+function M.notify_all_tracked()
+  for bufnr in pairs(M.tracked_buffers) do
+    M.notify_lsp_open(bufnr)
+  end
 end
 
 ---Unload a tracked buffer if it was loaded by LoadLSP
@@ -346,6 +355,8 @@ function M.load_files(opts)
           load_batch(end_idx + 1)
         end, cfg.batch_delay)
       else
+        -- All buffers loaded, now notify LSP about them
+        M.notify_all_tracked()
         vim.defer_fn(function()
           local diag_count = #vim.diagnostic.get()
           local skip_msg = skipped > 0 and string.format(' (%d already loaded)', skipped) or ''
