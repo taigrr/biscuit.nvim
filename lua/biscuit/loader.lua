@@ -182,6 +182,12 @@ function M.load_buffer_with_lsp(filepath, track)
   local was_loaded = vim.api.nvim_buf_is_loaded(bufnr)
   if not was_loaded then
     vim.fn.bufload(bufnr)
+    -- Set buffer as listed so FormatBuffers and other tools see it
+    vim.bo[bufnr].buflisted = true
+    -- Trigger FileType detection which causes LSP to attach
+    vim.api.nvim_buf_call(bufnr, function()
+      vim.cmd('filetype detect')
+    end)
     if track then
       M.tracked_buffers[bufnr] = true
     end
