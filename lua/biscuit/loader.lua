@@ -184,10 +184,28 @@ function M.load_buffer_with_lsp(filepath, track)
     vim.fn.bufload(bufnr)
     -- Set buffer as listed so FormatBuffers and other tools see it
     vim.bo[bufnr].buflisted = true
-    -- Trigger FileType detection and BufEnter so LSP attaches and sends didOpen
+    -- Trigger FileType detection so LSP attaches
     vim.api.nvim_buf_call(bufnr, function()
       vim.cmd('filetype detect')
-      vim.api.nvim_exec_autocmds('BufEnter', { buffer = bufnr })
+    end)
+    -- Explicitly notify LSP clients that this buffer is open
+    vim.schedule(function()
+      local clients = vim.lsp.get_clients({ bufnr = bufnr })
+      for _, client in ipairs(clients) do
+        if not client.attached_buffers[bufnr] then
+          vim.lsp.buf_attach_client(bufnr, client.id)
+        end
+        -- Send didOpen notification to trigger diagnostics
+        local params = {
+          textDocument = {
+            uri = vim.uri_from_bufnr(bufnr),
+            languageId = vim.bo[bufnr].filetype,
+            version = 0,
+            text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n'),
+          },
+        }
+        client.notify('textDocument/didOpen', params)
+      end
     end)
     if track then
       M.tracked_buffers[bufnr] = true
