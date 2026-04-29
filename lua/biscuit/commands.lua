@@ -36,6 +36,36 @@ function M.setup()
     desc = "Load files into LSP for project-wide diagnostics",
   })
 
+  -- Load files from a specific directory (non-workspace mode)
+  vim.api.nvim_create_user_command("LoadLSPDir", function()
+    local exts, err = loader.get_extensions_for_filetype()
+    if err then
+      vim.notify("[biscuit] " .. err, vim.log.levels.ERROR)
+      return
+    end
+
+    local cwd = vim.fn.getcwd()
+    vim.ui.input({
+      prompt = "Load " .. table.concat(exts, "/") .. " files from: ",
+      default = cwd,
+      completion = "dir",
+    }, function(input)
+      if not input or input == "" then
+        return
+      end
+
+      local folder = vim.fn.expand(input)
+      if vim.fn.isdirectory(folder) ~= 1 then
+        vim.notify("[biscuit] Not a directory: " .. folder, vim.log.levels.ERROR)
+        return
+      end
+
+      loader.load_files({ folder = folder, extensions = exts })
+    end)
+  end, {
+    desc = "Load files of current filetype from a directory (with prompt)",
+  })
+
   -- Unload hidden buffers
   vim.api.nvim_create_user_command("UnloadHidden", function()
     loader.unload_hidden()
