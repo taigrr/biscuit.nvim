@@ -18,12 +18,14 @@ function M.format_buffers(opts)
 
   -- Get all loaded buffers with LSP clients that support formatting
   local buffers_to_format = {}
+  local seen_buffers = {}
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) and vim.bo[bufnr].buflisted then
+    if vim.api.nvim_buf_is_loaded(bufnr) and vim.bo[bufnr].buflisted and not seen_buffers[bufnr] then
       local clients = vim.lsp.get_clients({ bufnr = bufnr })
       for _, client in ipairs(clients) do
         if client.supports_method('textDocument/formatting') then
           table.insert(buffers_to_format, bufnr)
+          seen_buffers[bufnr] = true
           break
         end
       end
