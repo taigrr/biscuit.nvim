@@ -306,7 +306,10 @@ function M.load_files(opts)
   -- Try to raise fd limit before loading hundreds of files
   local fd_limit = get_fd_limit()
   if fd_limit < 1024 then
-    notify(string.format('Warning: low fd limit (%d). Consider running `ulimit -n 4096` before Neovim.', fd_limit), 'warn')
+    notify(
+      string.format('Warning: low fd limit (%d). Consider running `ulimit -n 4096` before Neovim.', fd_limit),
+      'warn'
+    )
   end
 
   ---@cast exts string[]
