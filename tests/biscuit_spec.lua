@@ -28,6 +28,23 @@ describe('biscuit', function()
       assert.equals(3000, biscuit.config.wave_delay)
     end)
 
+    it('should reset prior user config when setup is called again', function()
+      biscuit.setup({
+        codes = { 'any' },
+        batch_size = 20,
+        auto_save = false,
+      })
+
+      biscuit.setup({
+        batch_delay = 100,
+      })
+
+      assert.same({}, biscuit.config.codes)
+      assert.equals(10, biscuit.config.batch_size)
+      assert.equals(100, biscuit.config.batch_delay)
+      assert.is_true(biscuit.config.auto_save)
+    end)
+
     it('should preserve exclude_dirs defaults when not overridden', function()
       biscuit.setup({})
       assert.is_table(biscuit.config.exclude_dirs)

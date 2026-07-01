@@ -13,7 +13,7 @@ local M = {}
 ---@field exclude_dirs string[] Directories to exclude from scanning
 
 ---@type Biscuit.Config
-M.config = {
+local default_config = {
   codes = {},
   batch_size = 10,
   batch_delay = 50,
@@ -24,10 +24,13 @@ M.config = {
   exclude_dirs = { 'node_modules', '.git', 'dist', 'build', '__pycache__', '.venv', 'vendor', '.next', 'coverage' },
 }
 
+---@type Biscuit.Config
+M.config = vim.deepcopy(default_config)
+
 ---@param opts? Biscuit.Config
 function M.setup(opts)
   opts = opts or {}
-  M.config = vim.tbl_deep_extend('force', M.config, opts)
+  M.config = vim.tbl_deep_extend('force', vim.deepcopy(default_config), opts)
   require('biscuit.commands').setup()
 end
 
