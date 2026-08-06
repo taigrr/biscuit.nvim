@@ -55,7 +55,7 @@ You have 200 Go files with `interface{}` that should be `any`. Opening each file
 ```lua
 {
   "taigrr/biscuit.nvim",
-  cmd = { "LoadLSP", "ApplyFixes", "ListDiagnosticCodes", "FormatBuffers" },
+  cmd = { "LoadLSP", "LoadLSPDir", "ApplyFixes", "ListDiagnosticCodes", "FormatBuffers" },
   opts = {
     codes = {
       "any",              -- interface{} -> any
@@ -97,6 +97,7 @@ You have 200 Go files with `interface{}` that should be `any`. Opening each file
 | Command | Description |
 |---------|-------------|
 | `:LoadLSP [dir] [exts...]` | Load files into LSP (uses current filetype if no args) |
+| `:LoadLSPDir` | Prompt for a directory and load files matching the current filetype |
 | `:UnloadHidden` | Unload hidden buffers to free resources |
 | `:UnloadTracked` | Unload buffers loaded by `:LoadLSP` |
 | `:ApplyFixes[!] [codes...]` | Apply quickfixes for diagnostic codes. `!` for dry run |
