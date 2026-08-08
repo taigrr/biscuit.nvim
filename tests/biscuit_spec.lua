@@ -64,6 +64,11 @@ describe('biscuit', function()
       assert.is_not_nil(cmds.LoadLSP)
     end)
 
+    it('should register LoadLSPDir command', function()
+      local cmds = vim.api.nvim_get_commands({})
+      assert.is_not_nil(cmds.LoadLSPDir)
+    end)
+
     it('should register ApplyFixes command', function()
       local cmds = vim.api.nvim_get_commands({})
       assert.is_not_nil(cmds.ApplyFixes)

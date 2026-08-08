@@ -42,7 +42,7 @@ your LSP (like gopls) takes time to recalculate after each change.
 Using lazy.nvim: >lua
     {
       "taigrr/biscuit.nvim",
-      cmd = { "LoadLSP", "ApplyFixes", "ListDiagnosticCodes", "FormatBuffers" },
+      cmd = { "LoadLSP", "LoadLSPDir", "ApplyFixes", "ListDiagnosticCodes", "FormatBuffers" },
       opts = {
         codes = {
           "any",              -- interface{} -> any
@@ -60,6 +60,12 @@ Using lazy.nvim: >lua
     Load files into LSP for project-wide diagnostics. Uses current buffer's
     filetype if no extensions are provided. Tracks loaded buffers for
     auto-cleanup after |:ApplyFixes|.
+
+                                                                   *:LoadLSPDir*
+:LoadLSPDir
+    Prompt for a directory, then load files matching the current buffer's
+    filetype from that directory. Useful when you want to scan outside the
+    current LSP workspace root.
 
                                                                  *:UnloadHidden*
 :UnloadHidden
