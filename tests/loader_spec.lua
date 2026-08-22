@@ -111,4 +111,29 @@ describe('biscuit.loader', function()
       assert.equals(vim.fn.getcwd(), root)
     end)
   end)
+
+  describe('create_notifier', function()
+    it('should preserve warning and error levels without noice', function()
+      package.loaded.noice = nil
+
+      local original_notify = vim.notify
+      local levels = {}
+      vim.notify = function(_, level)
+        table.insert(levels, level)
+      end
+
+      local notify = loader.create_notifier('Test')
+      notify('heads up', 'warn')
+      notify('broken', 'error')
+      notify('ok')
+
+      vim.notify = original_notify
+
+      assert.same({
+        vim.log.levels.WARN,
+        vim.log.levels.ERROR,
+        vim.log.levels.INFO,
+      }, levels)
+    end)
+  end)
 end)
