@@ -111,4 +111,40 @@ describe('biscuit.loader', function()
       assert.equals(vim.fn.getcwd(), root)
     end)
   end)
+
+  describe('create_notifier', function()
+    it('should preserve warning and error levels without noice', function()
+      local original_loaded_noice = package.loaded.noice
+      local original_preload_noice = package.preload.noice
+      -- Force the fallback path even if noice is installed: make require fail.
+      package.loaded.noice = nil
+      package.preload.noice = function()
+        error('noice disabled for test')
+      end
+
+      local original_notify = vim.notify
+      local levels = {}
+      vim.notify = function(_, level)
+        table.insert(levels, level)
+      end
+
+      local ok, err = pcall(function()
+        local notify = loader.create_notifier('Test')
+        notify('heads up', 'warn')
+        notify('broken', 'error')
+        notify('ok')
+      end)
+
+      vim.notify = original_notify
+      package.preload.noice = original_preload_noice
+      package.loaded.noice = original_loaded_noice
+
+      assert.is_true(ok, err)
+      assert.same({
+        vim.log.levels.WARN,
+        vim.log.levels.ERROR,
+        vim.log.levels.INFO,
+      }, levels)
+    end)
+  end)
 end)

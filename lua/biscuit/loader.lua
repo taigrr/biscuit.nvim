@@ -50,6 +50,12 @@ local function get_fd_limit()
   return tonumber(result) or 256
 end
 
+local notify_levels = {
+  error = vim.log.levels.ERROR,
+  warn = vim.log.levels.WARN,
+  info = vim.log.levels.INFO,
+}
+
 ---Get file extensions for current buffer's filetype
 ---@return string[]|nil extensions
 ---@return string|nil error
@@ -273,7 +279,7 @@ function M.create_notifier(title)
     if has_noice then
       msg_id = noice.notify(text, level, { title = title, replace = msg_id })
     else
-      vim.notify(text, level == 'error' and vim.log.levels.ERROR or vim.log.levels.INFO)
+      vim.notify(text, notify_levels[level] or vim.log.levels.INFO)
     end
   end
 end
