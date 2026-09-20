@@ -159,7 +159,7 @@ Run `:ListDiagnosticCodes` after `:LoadLSP` to see what codes your LSP provides.
 1. **Load files** — `:LoadLSP` loads matching files into buffers for LSP analysis
 2. **Filter diagnostics** — Finds diagnostics matching your configured codes
 3. **Request code actions** — For each matching diagnostic, requests quickfix actions
-4. **Apply if unique** — Only applies when exactly ONE quickfix action exists
+4. **Apply first quickfix** — Filters to quickfix-kind actions and applies the first result
 5. **Auto-save** — Optionally saves modified files
 
 ## Health Check
