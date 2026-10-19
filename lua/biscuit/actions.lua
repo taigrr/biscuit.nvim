@@ -101,6 +101,7 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
     },
     context = {
       diagnostics = { lsp_diag },
+      only = { 'quickfix' },
       triggerKind = vim.lsp.protocol.CodeActionTriggerKind.Invoked,
     },
   }

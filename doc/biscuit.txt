@@ -80,6 +80,8 @@ Using lazy.nvim: >lua
 :ApplyFixes[!] [codes...]
     Apply quickfix actions for diagnostics matching specified codes.
     If no codes specified, uses configured codes from setup().
+    Biscuit filters LSP results to quickfix-kind actions and applies the
+    first quickfix returned for each diagnostic.
     Use `!` for dry run mode to preview changes.
 
     Processing happens in waves:~
