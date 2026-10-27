@@ -115,7 +115,7 @@ local function apply_one_fix(bufnr, diag, dry_run, callback)
     end
 
     local quickfix_actions = vim.tbl_filter(function(a)
-      return a.kind and (a.kind == 'quickfix' or vim.startswith(a.kind, 'quickfix.'))
+      return not a.disabled and a.kind and (a.kind == 'quickfix' or vim.startswith(a.kind, 'quickfix.'))
     end, actions)
 
     if #quickfix_actions >= 1 then
