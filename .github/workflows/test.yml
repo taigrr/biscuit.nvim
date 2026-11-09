@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        nvim-version: ["stable", "nightly"]
+        nvim-version: ["v0.10.4", "stable", "nightly"]
     steps:
       - uses: actions/checkout@v4
 
@@ -28,3 +28,14 @@ jobs:
       - name: Run tests
         run: |
           nvim --headless -u tests/minimal_init.lua -c "PlenaryBustedDirectory tests/ {minimal_init = 'tests/minimal_init.lua'}"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Luacheck
+        run: sudo apt-get update && sudo apt-get install -y lua-check
+
+      - name: Run lint
+        run: make lint
