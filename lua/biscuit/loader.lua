@@ -234,9 +234,12 @@ end
 ---@return boolean was_unloaded
 function M.unload_tracked(bufnr)
   if M.tracked_buffers[bufnr] then
+    if vim.api.nvim_buf_is_valid(bufnr) and vim.bo[bufnr].modified then
+      return false
+    end
     M.tracked_buffers[bufnr] = nil
     if vim.api.nvim_buf_is_valid(bufnr) then
-      vim.api.nvim_buf_delete(bufnr, { force = true })
+      vim.api.nvim_buf_delete(bufnr, {})
       return true
     end
   end
@@ -258,12 +261,10 @@ end
 function M.clear_tracked()
   local count = 0
   for bufnr in pairs(M.tracked_buffers) do
-    if vim.api.nvim_buf_is_valid(bufnr) then
-      vim.api.nvim_buf_delete(bufnr, { force = true })
+    if M.unload_tracked(bufnr) then
       count = count + 1
     end
   end
-  M.tracked_buffers = {}
   return count
 end
 
@@ -382,10 +383,10 @@ end
 function M.unload_hidden()
   local count = 0
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) and vim.fn.buflisted(bufnr) == 1 then
+    if vim.api.nvim_buf_is_loaded(bufnr) and vim.fn.buflisted(bufnr) == 1 and not vim.bo[bufnr].modified then
       local wins = vim.fn.win_findbuf(bufnr)
       if #wins == 0 then
-        vim.api.nvim_buf_delete(bufnr, { force = true })
+        vim.api.nvim_buf_delete(bufnr, {})
         count = count + 1
       end
     end

@@ -69,12 +69,14 @@ Using lazy.nvim: >lua
 
                                                                  *:UnloadHidden*
 :UnloadHidden
-    Unload all hidden buffers to free LSP resources.
+    Unload unmodified hidden buffers to free LSP resources.
+    Modified buffers are preserved.
 
                                                                 *:UnloadTracked*
 :UnloadTracked
     Unload buffers that were loaded by |:LoadLSP|. Called automatically
-    by |:ApplyFixes| when `auto_close = true`.
+    by |:ApplyFixes| when `auto_close = true`. Modified buffers are
+    preserved and remain tracked for later cleanup.
 
                                                                    *:ApplyFixes*
 :ApplyFixes[!] [codes...]
@@ -189,7 +191,7 @@ require("biscuit.loader").tracked_buffers
 
                                                *biscuit.loader.clear_tracked()*
 require("biscuit.loader").clear_tracked()
-    Unload all tracked buffers and clear the tracking table.
+    Unload unmodified tracked buffers. Modified buffers remain tracked.
     Returns the number of buffers unloaded.
 
 ==============================================================================

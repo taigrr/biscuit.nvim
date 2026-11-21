@@ -105,6 +105,46 @@ describe('biscuit.loader', function()
     end)
   end)
 
+  describe('modified buffer cleanup', function()
+    local bufnr
+
+    before_each(function()
+      bufnr = vim.api.nvim_create_buf(true, false)
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { 'unsaved changes' })
+      loader.tracked_buffers = { [bufnr] = true }
+    end)
+
+    after_each(function()
+      if vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+      end
+      loader.tracked_buffers = {}
+    end)
+
+    it('should preserve modified buffers during automatic tracked cleanup', function()
+      assert.is_false(loader.unload_tracked(bufnr))
+      assert.is_true(vim.api.nvim_buf_is_loaded(bufnr))
+      assert.is_true(loader.tracked_buffers[bufnr])
+      assert.same({ 'unsaved changes' }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+    end)
+
+    it('should keep modified buffers tracked until they can be cleared safely', function()
+      assert.equals(0, loader.clear_tracked())
+      assert.is_true(vim.api.nvim_buf_is_loaded(bufnr))
+      assert.is_true(loader.tracked_buffers[bufnr])
+      vim.bo[bufnr].modified = false
+      assert.equals(1, loader.clear_tracked())
+      assert.equals(0, loader.tracked_count())
+    end)
+
+    it('should preserve modified hidden buffers', function()
+      assert.same({}, vim.fn.win_findbuf(bufnr))
+      loader.unload_hidden()
+      assert.is_true(vim.api.nvim_buf_is_loaded(bufnr))
+      assert.same({ 'unsaved changes' }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+    end)
+  end)
+
   describe('get_root', function()
     it('should return cwd when no LSP is attached', function()
       local root = loader.get_root()
